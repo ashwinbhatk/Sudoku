@@ -1,4 +1,3 @@
-slint::include_modules!();
 use sudoku::ui_bridge;
 
 fn main() -> Result<(), slint::PlatformError> {
