@@ -18,7 +18,7 @@ impl Default for Bitmask {
 impl Bitmask {
     pub fn new(grid: &[[u8; 9]; 9]) -> Self {
         // Initialise Bitmask values to 0
-        let mut bitmask = Bitmask::default(); 
+        let mut bitmask = Bitmask::default();
 
         for row in 0..9 {
             for col in 0..9 {
