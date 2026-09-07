@@ -2,22 +2,57 @@ component SudokuCell inherits Rectangle {
     in property <int> value;
     in property <int> cell_index;
     in property <bool> selected;
-    
-    width: 50px;
-    height: 50px;
-    background: selected ? blue : white;
-    
+    in property <bool> show_right_border: false;
+    in property <int> valid_row;
+
+    property <[int]> valid_row_border: [18, 19, 20, 21, 22, 23, 24, 25, 26];
+
+    width: 80px;
+    height: 80px;
+    background: selected ? skyblue : white;
+
     callback clicked(int);
 
     TouchArea {
         clicked => {
             root.clicked(root.cell_index);
         }
-    }   
+    }
 
     Text {
         text: value;
-        color: green;
+        color: black;
+    }
+
+    // Black right-border
+    Rectangle {
+        x: parent.width - 2px;
+        width: show_right_border ? 2px : 0px;
+        height: parent.height;
+        background: black;
+    }
+
+    //Black bottom-border
+    for row in valid_row_border: Rectangle {
+        y: parent.height - 2px;
+        width: parent.width;
+        height: (row == valid_row) ? 2px : 0px;
+        background: black;
+    }
+
+    //Beige borders
+    Rectangle {
+        x: parent.width - 1px;
+        width: 1px;
+        height: parent.height;
+        background: beige;
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        width: parent.width;
+        height: 1px;
+        background: beige;
     }
 }
 
@@ -26,13 +61,13 @@ export component SudokuWindow inherits Window {
     property <[int]> rows: [0, 1, 2, 3, 4, 5, 6, 7, 8];
     property <[int]> cols: [0, 1, 2, 3, 4, 5, 6, 7, 8];
     property <int> selected_cell: -1;
-    
+
     min-width: 400px;
     min-height: 400px;
     background: black;
 
     callback cell_clicked(int);
-    
+
     GridLayout {
         for row in rows: Row {
             for col in cols: SudokuCell {
@@ -40,6 +75,8 @@ export component SudokuWindow inherits Window {
                 value: cells[index];
                 cell_index: index;
                 selected: selected_cell == index;
+                show_right_border: Math.mod(index, 3) == 2;
+                valid_row: Math.mod(index, 27);
 
                 clicked(index) => {
                     root.cell_clicked(index);
@@ -52,5 +89,4 @@ export component SudokuWindow inherits Window {
         selected_cell = index;
         debug(selected_cell);
     }
-    
 }
