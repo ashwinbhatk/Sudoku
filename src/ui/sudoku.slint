@@ -9,7 +9,7 @@ component SudokuCell inherits Rectangle {
 
     width: 80px;
     height: 80px;
-    background: selected ? skyblue : white;
+    background: selected ? skyblue : lightgrey;
 
     callback clicked(int);
 
@@ -20,6 +20,7 @@ component SudokuCell inherits Rectangle {
     }
 
     Text {
+        font-size: 20px;
         text: value;
         color: black;
     }
@@ -45,14 +46,54 @@ component SudokuCell inherits Rectangle {
         x: parent.width - 1px;
         width: 1px;
         height: parent.height;
-        background: beige;
+        background: navy;
     }
 
     Rectangle {
         y: parent.height - 1px;
         width: parent.width;
         height: 1px;
-        background: beige;
+        background: navy;
+    }
+
+    in-out property <string> box_value;
+
+    function is_valid_num(value: string) -> bool {
+        return value == "1" ||
+            value == "2" ||
+            value == "3" ||
+            value == "4" ||
+            value == "5" ||
+            value == "6" ||
+            value == "7" ||
+            value == "8" ||
+            value == "9";
+    }
+
+    TextInput {
+        text <=> box_value;
+        input-type: number;
+        read-only: true;
+
+        key-pressed(event) => {
+            if(root.is_valid_num(event.text)) {
+                box_value = event.text;
+                accept
+            }
+            reject
+        }
+        
+        width: max(parent.width, self.preferred-width);
+        vertical-alignment: center;
+
+        private property <length> margin: 1rem;
+        cursor-position-changed(cursor-position) => {
+            if cursor-position.x + self.x < margin {
+                self.x = - cursor-position.x + margin;
+            } else if cursor-position.x + self.x > parent.width - margin - self.text-cursor-width {
+                self.x = parent.width - cursor-position.x - margin - self.text-cursor-width;
+            }
+        }
     }
 }
 
