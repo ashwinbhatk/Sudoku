@@ -2,16 +2,18 @@ component SudokuCell inherits Rectangle {
     in property <int> value;
     in property <int> cell_index;
     in property <bool> selected;
+    in property <bool> is_given: false;
     in property <bool> show_right_border: false;
     in property <int> valid_row;
 
     property <[int]> valid_row_border: [18, 19, 20, 21, 22, 23, 24, 25, 26];
 
-    width: 80px;
-    height: 80px;
-    background: selected ? skyblue : lightgrey;
+    width: 50px;
+    height: 50px;
+    background: selected ? #e3f2fd : (is_given ? #f5f5f5 : white);
 
     callback clicked(int);
+    callback value_changed(int, int);
 
     TouchArea {
         clicked => {
@@ -19,13 +21,7 @@ component SudokuCell inherits Rectangle {
         }
     }
 
-    Text {
-        font-size: 20px;
-        text: value;
-        color: black;
-    }
-
-    // Black right-border
+    // Black right-border for 3x3 grid divisions
     Rectangle {
         x: parent.width - 2px;
         width: show_right_border ? 2px : 0px;
@@ -33,7 +29,7 @@ component SudokuCell inherits Rectangle {
         background: black;
     }
 
-    //Black bottom-border
+    // Black bottom-border for 3x3 grid divisions
     for row in valid_row_border: Rectangle {
         y: parent.height - 2px;
         width: parent.width;
@@ -41,22 +37,22 @@ component SudokuCell inherits Rectangle {
         background: black;
     }
 
-    //Beige borders
+    // Thin borders between cells
     Rectangle {
         x: parent.width - 1px;
         width: 1px;
         height: parent.height;
-        background: navy;
+        background: #bdbdbd;
     }
 
     Rectangle {
         y: parent.height - 1px;
         width: parent.width;
         height: 1px;
-        background: navy;
+        background: #bdbdbd;
     }
 
-    in-out property <string> box_value;
+    in-out property <string> text_value: value > 0 ? value : "";
 
     function is_valid_num(value: string) -> bool {
         return value == "1" ||
@@ -67,67 +63,223 @@ component SudokuCell inherits Rectangle {
             value == "6" ||
             value == "7" ||
             value == "8" ||
-            value == "9";
+            value == "9" ||
+            value == "";
     }
 
     TextInput {
-        text <=> box_value;
-        input-type: number;
-        read-only: true;
+        text <=> text_value;
+        font-size: 24px;
+        font-weight: is_given ? 700 : 400;
+        color: is_given ? #1a237e : #424242;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        read-only: is_given;
+        
+        edited => {
+            if text_value == "" {
+                root.value_changed(root.cell_index, 0);
+            } else if root.is_valid_num(text_value) {
+                root.value_changed(root.cell_index, text_value.to_float());
+            }
+        }
 
         key-pressed(event) => {
-            if(root.is_valid_num(event.text)) {
-                box_value = event.text;
+            if event.text == "" || root.is_valid_num(event.text) {
                 accept
-            }
-            reject
-        }
-        
-        width: max(parent.width, self.preferred-width);
-        vertical-alignment: center;
-
-        private property <length> margin: 1rem;
-        cursor-position-changed(cursor-position) => {
-            if cursor-position.x + self.x < margin {
-                self.x = - cursor-position.x + margin;
-            } else if cursor-position.x + self.x > parent.width - margin - self.text-cursor-width {
-                self.x = parent.width - cursor-position.x - margin - self.text-cursor-width;
+            } else {
+                reject
             }
         }
     }
 }
 
 export component SudokuWindow inherits Window {
-    in property <[int]> cells;
+    in-out property <[int]> cells;
+    in property <[bool]> given_cells;
+    in-out property <string> status_message: "";
+    in-out property <bool> status_is_error: false;
     property <[int]> rows: [0, 1, 2, 3, 4, 5, 6, 7, 8];
     property <[int]> cols: [0, 1, 2, 3, 4, 5, 6, 7, 8];
     property <int> selected_cell: -1;
 
-    min-width: 400px;
-    min-height: 400px;
-    background: black;
+    title: "Sudoku Solver";
+    preferred-width: 550px;
+    preferred-height: 700px;
+    background: #fafafa;
 
     callback cell_clicked(int);
+    callback cell_value_changed(int, int);
+    callback solve_clicked();
+    callback clear_clicked();
+    callback reset_clicked();
 
-    GridLayout {
-        for row in rows: Row {
-            for col in cols: SudokuCell {
-                property <int> index: row * 9 + col;
-                value: cells[index];
-                cell_index: index;
-                selected: selected_cell == index;
-                show_right_border: Math.mod(index, 3) == 2;
-                valid_row: Math.mod(index, 27);
+    VerticalLayout {
+        padding: 20px;
+        spacing: 20px;
 
-                clicked(index) => {
-                    root.cell_clicked(index);
+        // Title
+        Text {
+            text: "Sudoku Solver";
+            font-size: 28px;
+            font-weight: 700;
+            color: #1976d2;
+            horizontal-alignment: center;
+        }
+
+        // Status Message
+        if status_message != "": Rectangle {
+            height: 40px;
+            border-radius: 6px;
+            background: status_is_error ? #ffebee : #e8f5e9;
+            border-width: 1px;
+            border-color: status_is_error ? #ef5350 : #66bb6a;
+
+            HorizontalLayout {
+                padding: 10px;
+                
+                Text {
+                    text: status_message;
+                    font-size: 14px;
+                    color: status_is_error ? #c62828 : #2e7d32;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
                 }
             }
+        }
+
+        // Sudoku Grid Container
+        Rectangle {
+            height: 458px;
+            
+            HorizontalLayout {
+                alignment: center;
+                
+                Rectangle {
+                    width: 458px;
+                    height: 458px;
+                    border-width: 3px;
+                    border-color: black;
+                    background: white;
+
+                    GridLayout {
+                        padding: 2px;
+                        spacing: 0px;
+                        
+                        for row in rows: Row {
+                            for col in cols: SudokuCell {
+                                property <int> index: row * 9 + col;
+                                value: cells[index];
+                                cell_index: index;
+                                selected: selected_cell == index;
+                                is_given: given_cells[index];
+                                show_right_border: Math.mod(col + 1, 3) == 0 && col != 8;
+                                valid_row: Math.mod(index, 27);
+
+                                clicked(index) => {
+                                    root.cell_clicked(index);
+                                }
+
+                                value_changed(index, new_value) => {
+                                    root.cell_value_changed(index, new_value);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Button Container
+        HorizontalLayout {
+            spacing: 15px;
+            alignment: center;
+
+            Rectangle {
+                width: 120px;
+                height: 45px;
+                border-radius: 8px;
+                background: solve_touch.has-hover ? #1565c0 : #1976d2;
+                border-width: 2px;
+                border-color: #0d47a1;
+
+                solve_touch := TouchArea {
+                    clicked => {
+                        root.solve_clicked();
+                    }
+                }
+
+                Text {
+                    text: "Solve";
+                    color: white;
+                    font-size: 18px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                width: 120px;
+                height: 45px;
+                border-radius: 8px;
+                background: clear_touch.has-hover ? #f57c00 : #ff9800;
+                border-width: 2px;
+                border-color: #e65100;
+
+                clear_touch := TouchArea {
+                    clicked => {
+                        root.clear_clicked();
+                    }
+                }
+
+                Text {
+                    text: "Clear";
+                    color: white;
+                    font-size: 18px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                width: 120px;
+                height: 45px;
+                border-radius: 8px;
+                background: reset_touch.has-hover ? #c62828 : #d32f2f;
+                border-width: 2px;
+                border-color: #b71c1c;
+
+                reset_touch := TouchArea {
+                    clicked => {
+                        root.reset_clicked();
+                    }
+                }
+
+                Text {
+                    text: "Reset";
+                    color: white;
+                    font-size: 18px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // Instructions
+        Text {
+            text: "Click a cell and type 1-9 to enter numbers. Given numbers are shown in bold blue.";
+            font-size: 14px;
+            color: #616161;
+            horizontal-alignment: center;
+            wrap: word-wrap;
         }
     }
 
     cell_clicked(index) => {
         selected_cell = index;
-        debug(selected_cell);
     }
 }
