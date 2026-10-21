@@ -1,19 +1,46 @@
+component CandidateCell inherits Rectangle {
+    in property <int> digit;
+    in property <bool> active;
+    in property <color> text_color;
+
+    width: 14px;
+    height: 14px;
+
+    Text {
+        text: root.active ? root.digit : "";
+        font-size: 10px;
+        font-weight: 600;
+        color: root.text_color;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
 component SudokuCell inherits Rectangle {
     in property <int> value;
     in property <int> cell_index;
     in property <bool> selected;
-    in property <bool> is_given: false;
-    in property <bool> show_right_border: false;
-    in property <int> valid_row;
+    in property <bool> is_given;
+    in property <bool> is_conflict;
+    in property <bool> is_same_number;
+    in property <bool> is_crosshair;
+    in property <int> notes_mask;
+    in property <bool> show_right_border;
+    in property <bool> show_bottom_border;
+    in property <bool> dark_mode;
 
-    property <[int]> valid_row_border: [18, 19, 20, 21, 22, 23, 24, 25, 26];
+    width: 52px;
+    height: 52px;
 
-    width: 50px;
-    height: 50px;
-    background: selected ? #e3f2fd : (is_given ? #f5f5f5 : white);
+    // Background color priority: conflict > selected > same_number > crosshair > given > normal
+    background: is_conflict ? (dark_mode ? #5c1d1d : #ffebee) :
+                selected ? (dark_mode ? #1e3a5f : #bbdefb) :
+                is_same_number ? (dark_mode ? #283548 : #e3f2fd) :
+                is_crosshair ? (dark_mode ? #1f2937 : #f5f9fc) :
+                is_given ? (dark_mode ? #1c1917 : #f8fafc) :
+                (dark_mode ? #262626 : #ffffff);
 
     callback clicked(int);
-    callback value_changed(int, int);
 
     TouchArea {
         clicked => {
@@ -21,169 +48,416 @@ component SudokuCell inherits Rectangle {
         }
     }
 
-    // Black right-border for 3x3 grid divisions
-    Rectangle {
+    // Heavy right border for 3x3 grid divisions
+    if show_right_border: Rectangle {
         x: parent.width - 2px;
-        width: show_right_border ? 2px : 0px;
+        width: 2px;
         height: parent.height;
-        background: black;
+        background: root.dark_mode ? #94a3b8 : #1e293b;
     }
 
-    // Black bottom-border for 3x3 grid divisions
-    for row in valid_row_border: Rectangle {
+    // Heavy bottom border for 3x3 grid divisions
+    if show_bottom_border: Rectangle {
         y: parent.height - 2px;
         width: parent.width;
-        height: (row == valid_row) ? 2px : 0px;
-        background: black;
+        height: 2px;
+        background: root.dark_mode ? #94a3b8 : #1e293b;
     }
 
-    // Thin borders between cells
+    // Light grid divider lines
     Rectangle {
         x: parent.width - 1px;
         width: 1px;
         height: parent.height;
-        background: #bdbdbd;
+        background: root.dark_mode ? #3f3f46 : #e2e8f0;
     }
 
     Rectangle {
         y: parent.height - 1px;
         width: parent.width;
         height: 1px;
-        background: #bdbdbd;
+        background: root.dark_mode ? #3f3f46 : #e2e8f0;
     }
 
-    in-out property <string> text_value: value > 0 ? value : "";
-
-    function is_valid_num(value: string) -> bool {
-        return value == "1" ||
-            value == "2" ||
-            value == "3" ||
-            value == "4" ||
-            value == "5" ||
-            value == "6" ||
-            value == "7" ||
-            value == "8" ||
-            value == "9" ||
-            value == "";
-    }
-
-    TextInput {
-        text <=> text_value;
-        font-size: 24px;
-        font-weight: is_given ? 700 : 400;
-        color: is_given ? #1a237e : #424242;
+    // Cell value display (when value > 0)
+    if value > 0: Text {
+        text: value;
+        font-size: 26px;
+        font-weight: is_given ? 800 : 600;
+        color: is_conflict ? (dark_mode ? #f87171 : #dc2626) :
+               is_given ? (dark_mode ? #60a5fa : #1d4ed8) :
+               (dark_mode ? #f1f5f9 : #1e293b);
         horizontal-alignment: center;
         vertical-alignment: center;
-        read-only: is_given;
-        
-        edited => {
-            if text_value == "" {
-                root.value_changed(root.cell_index, 0);
-            } else if root.is_valid_num(text_value) {
-                root.value_changed(root.cell_index, text_value.to_float());
+    }
+
+    // Candidate Notes 3x3 Grid (when value == 0)
+    if value == 0: GridLayout {
+        padding: 2px;
+        spacing: 1px;
+        Row {
+            CandidateCell {
+                digit: 1;
+                active: Math.mod(Math.floor(notes_mask / 1), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
+            }
+            CandidateCell {
+                digit: 2;
+                active: Math.mod(Math.floor(notes_mask / 2), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
+            }
+            CandidateCell {
+                digit: 3;
+                active: Math.mod(Math.floor(notes_mask / 4), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
             }
         }
-
-        key-pressed(event) => {
-            if event.text == "" || root.is_valid_num(event.text) {
-                accept
-            } else {
-                reject
+        Row {
+            CandidateCell {
+                digit: 4;
+                active: Math.mod(Math.floor(notes_mask / 8), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
+            }
+            CandidateCell {
+                digit: 5;
+                active: Math.mod(Math.floor(notes_mask / 16), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
+            }
+            CandidateCell {
+                digit: 6;
+                active: Math.mod(Math.floor(notes_mask / 32), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
+            }
+        }
+        Row {
+            CandidateCell {
+                digit: 7;
+                active: Math.mod(Math.floor(notes_mask / 64), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
+            }
+            CandidateCell {
+                digit: 8;
+                active: Math.mod(Math.floor(notes_mask / 128), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
+            }
+            CandidateCell {
+                digit: 9;
+                active: Math.mod(Math.floor(notes_mask / 256), 2) == 1;
+                text_color: root.dark_mode ? #a1a1aa : #64748b;
             }
         }
     }
 }
 
 export component SudokuWindow inherits Window {
+    // Board Data Models (81 items each)
     in-out property <[int]> cells;
     in property <[bool]> given_cells;
-    in-out property <string> status_message: "";
-    in-out property <bool> status_is_error: false;
+    in property <[bool]> conflict_cells;
+    in property <[bool]> same_num_cells;
+    in property <[bool]> crosshair_cells;
+    in-out property <[int]> cell_notes;
+
+    // Game & UI States
+    in-out property <int> selected_cell: -1;
+    in-out property <bool> pencil_mode: false;
+    in-out property <bool> dark_mode: false;
+    in-out property <string> timer_text: "00:00";
+    in-out property <bool> is_paused: false;
+    in-out property <int> difficulty: 0; // 0: Easy, 1: Medium, 2: Hard, 3: Expert
+    in-out property <bool> custom_mode: false;
+    in-out property <string> status_message: "Welcome to Sudoku Pro! Select a cell to play.";
+    in-out property <int> status_type: 0; // 0: info, 1: success, 2: error, 3: hint
+    in-out property <bool> can_undo: false;
+    in-out property <bool> can_redo: false;
+
     property <[int]> rows: [0, 1, 2, 3, 4, 5, 6, 7, 8];
     property <[int]> cols: [0, 1, 2, 3, 4, 5, 6, 7, 8];
-    property <int> selected_cell: -1;
 
-    title: "Sudoku Solver";
-    preferred-width: 550px;
-    preferred-height: 700px;
-    background: #fafafa;
+    title: "Sudoku Pro & Intelligent Solver";
+    preferred-width: 620px;
+    preferred-height: 850px;
+    background: dark_mode ? #121212 : #f8fafc;
 
     callback cell_clicked(int);
-    callback cell_value_changed(int, int);
+    callback digit_entered(int);
+    callback erase_clicked();
+    callback toggle_pencil_mode();
     callback solve_clicked();
+    callback validate_clicked();
     callback clear_clicked();
     callback reset_clicked();
+    callback hint_clicked();
+    callback undo_clicked();
+    callback redo_clicked();
+    callback new_game_clicked();
+    callback difficulty_changed(int);
+    callback toggle_theme();
+    callback toggle_custom_mode();
+    callback toggle_pause();
+    callback auto_notes_clicked();
 
     VerticalLayout {
-        padding: 20px;
-        spacing: 20px;
+        padding: 16px;
+        spacing: 12px;
 
-        // Title
-        Text {
-            text: "Sudoku Solver";
-            font-size: 28px;
-            font-weight: 700;
-            color: #1976d2;
-            horizontal-alignment: center;
-        }
+        // Top Header: Title, Timer, Pause, Theme
+        HorizontalLayout {
+            alignment: space-between;
 
-        // Status Message
-        if status_message != "": Rectangle {
-            height: 40px;
-            border-radius: 6px;
-            background: status_is_error ? #ffebee : #e8f5e9;
-            border-width: 1px;
-            border-color: status_is_error ? #ef5350 : #66bb6a;
+            Text {
+                text: "Sudoku Pro";
+                font-size: 26px;
+                font-weight: 800;
+                color: root.dark_mode ? #60a5fa : #2563eb;
+                vertical-alignment: center;
+            }
 
             HorizontalLayout {
-                padding: 10px;
-                
-                Text {
-                    text: status_message;
-                    font-size: 14px;
-                    color: status_is_error ? #c62828 : #2e7d32;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                    wrap: word-wrap;
+                spacing: 10px;
+
+                // Timer Pill
+                Rectangle {
+                    height: 36px;
+                    border-radius: 18px;
+                    background: root.dark_mode ? #27272a : #e2e8f0;
+                    border-width: 1px;
+                    border-color: root.dark_mode ? #3f3f46 : #cbd5e1;
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 6px;
+
+                        Text {
+                            text: is_paused ? "PAUSED" : timer_text;
+                            font-size: 15px;
+                            font-weight: 700;
+                            color: root.dark_mode ? #f4f4f5 : #0f172a;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            width: 20px;
+                            clicked => { root.toggle_pause(); }
+                            Text {
+                                text: is_paused ? "▶" : "⏸";
+                                font-size: 13px;
+                                color: root.dark_mode ? #38bdf8 : #0284c7;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Theme Toggle Button
+                Rectangle {
+                    width: 40px;
+                    height: 36px;
+                    border-radius: 18px;
+                    background: root.dark_mode ? #27272a : #e2e8f0;
+                    border-width: 1px;
+                    border-color: root.dark_mode ? #3f3f46 : #cbd5e1;
+
+                    TouchArea {
+                        clicked => { root.toggle_theme(); }
+                    }
+
+                    Text {
+                        text: root.dark_mode ? "☀️" : "🌙";
+                        font-size: 16px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
                 }
             }
         }
 
-        // Sudoku Grid Container
-        Rectangle {
-            height: 458px;
-            
+        // Secondary Header: Difficulty Selector, New Game, Custom Clues
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: space-between;
+
+            // Difficulty Pills
             HorizontalLayout {
-                alignment: center;
-                
+                spacing: 6px;
+
+                // Easy
                 Rectangle {
-                    width: 458px;
-                    height: 458px;
-                    border-width: 3px;
-                    border-color: black;
-                    background: white;
+                    height: 32px;
+                    border-radius: 6px;
+                    background: difficulty == 0 ? (root.dark_mode ? #1d4ed8 : #2563eb) : (root.dark_mode ? #27272a : #e2e8f0);
+                    TouchArea { clicked => { root.difficulty_changed(0); } }
+                    HorizontalLayout {
+                        padding-left: 10px; padding-right: 10px;
+                        Text {
+                            text: "Easy";
+                            font-size: 13px;
+                            font-weight: difficulty == 0 ? 700 : 500;
+                            color: difficulty == 0 ? white : (root.dark_mode ? #a1a1aa : #475569);
+                            vertical-alignment: center;
+                        }
+                    }
+                }
 
-                    GridLayout {
-                        padding: 2px;
-                        spacing: 0px;
-                        
-                        for row in rows: Row {
-                            for col in cols: SudokuCell {
-                                property <int> index: row * 9 + col;
-                                value: cells[index];
-                                cell_index: index;
-                                selected: selected_cell == index;
-                                is_given: given_cells[index];
-                                show_right_border: Math.mod(col + 1, 3) == 0 && col != 8;
-                                valid_row: Math.mod(index, 27);
+                // Medium
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: difficulty == 1 ? (root.dark_mode ? #1d4ed8 : #2563eb) : (root.dark_mode ? #27272a : #e2e8f0);
+                    TouchArea { clicked => { root.difficulty_changed(1); } }
+                    HorizontalLayout {
+                        padding-left: 10px; padding-right: 10px;
+                        Text {
+                            text: "Medium";
+                            font-size: 13px;
+                            font-weight: difficulty == 1 ? 700 : 500;
+                            color: difficulty == 1 ? white : (root.dark_mode ? #a1a1aa : #475569);
+                            vertical-alignment: center;
+                        }
+                    }
+                }
 
-                                clicked(index) => {
-                                    root.cell_clicked(index);
-                                }
+                // Hard
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: difficulty == 2 ? (root.dark_mode ? #1d4ed8 : #2563eb) : (root.dark_mode ? #27272a : #e2e8f0);
+                    TouchArea { clicked => { root.difficulty_changed(2); } }
+                    HorizontalLayout {
+                        padding-left: 10px; padding-right: 10px;
+                        Text {
+                            text: "Hard";
+                            font-size: 13px;
+                            font-weight: difficulty == 2 ? 700 : 500;
+                            color: difficulty == 2 ? white : (root.dark_mode ? #a1a1aa : #475569);
+                            vertical-alignment: center;
+                        }
+                    }
+                }
 
-                                value_changed(index, new_value) => {
-                                    root.cell_value_changed(index, new_value);
-                                }
+                // Expert
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: difficulty == 3 ? (root.dark_mode ? #1d4ed8 : #2563eb) : (root.dark_mode ? #27272a : #e2e8f0);
+                    TouchArea { clicked => { root.difficulty_changed(3); } }
+                    HorizontalLayout {
+                        padding-left: 10px; padding-right: 10px;
+                        Text {
+                            text: "Expert";
+                            font-size: 13px;
+                            font-weight: difficulty == 3 ? 700 : 500;
+                            color: difficulty == 3 ? white : (root.dark_mode ? #a1a1aa : #475569);
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 6px;
+
+                // New Game Button
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: new_game_touch.has-hover ? #0284c7 : #0ea5e9;
+                    new_game_touch := TouchArea { clicked => { root.new_game_clicked(); } }
+                    HorizontalLayout {
+                        padding-left: 12px; padding-right: 12px;
+                        Text {
+                            text: "+ New Game";
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: white;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Custom Mode Button
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: custom_mode ? #f59e0b : (root.dark_mode ? #3f3f46 : #cbd5e1);
+                    TouchArea { clicked => { root.toggle_custom_mode(); } }
+                    HorizontalLayout {
+                        padding-left: 10px; padding-right: 10px;
+                        Text {
+                            text: custom_mode ? "Lock Clues" : "Set Clues";
+                            font-size: 13px;
+                            font-weight: 600;
+                            color: custom_mode ? white : (root.dark_mode ? #f4f4f5 : #334155);
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Status Feedback Banner
+        Rectangle {
+            height: 36px;
+            border-radius: 6px;
+            background: status_type == 1 ? (root.dark_mode ? #064e3b : #ecfdf5) :
+                        status_type == 2 ? (root.dark_mode ? #7f1d1d : #fef2f2) :
+                        status_type == 3 ? (root.dark_mode ? #78350f : #fffbeb) :
+                        (root.dark_mode ? #1e293b : #eff6ff);
+            border-width: 1px;
+            border-color: status_type == 1 ? #10b981 :
+                          status_type == 2 ? #ef4444 :
+                          status_type == 3 ? #f59e0b : #3b82f6;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                Text {
+                    text: status_message;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: status_type == 1 ? (root.dark_mode ? #6ee7b7 : #047857) :
+                           status_type == 2 ? (root.dark_mode ? #fca5a5 : #b91c1c) :
+                           status_type == 3 ? (root.dark_mode ? #fcd34d : #b45309) :
+                           (root.dark_mode ? #93c5fd : #1d4ed8);
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+
+        // Sudoku 9x9 Board
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 472px;
+                height: 472px;
+                border-width: 3px;
+                border-color: root.dark_mode ? #94a3b8 : #0f172a;
+                background: root.dark_mode ? #18181b : #ffffff;
+
+                GridLayout {
+                    padding: 0px;
+                    spacing: 0px;
+
+                    for row in rows: Row {
+                        for col in cols: SudokuCell {
+                            property <int> idx: row * 9 + col;
+                            value: cells[idx];
+                            cell_index: idx;
+                            selected: selected_cell == idx;
+                            is_given: given_cells[idx];
+                            is_conflict: conflict_cells[idx];
+                            is_same_number: same_num_cells[idx];
+                            is_crosshair: crosshair_cells[idx];
+                            notes_mask: cell_notes[idx];
+                            show_right_border: Math.mod(col + 1, 3) == 0 && col != 8;
+                            show_bottom_border: Math.mod(row + 1, 3) == 0 && row != 8;
+                            dark_mode: root.dark_mode;
+
+                            clicked(i) => {
+                                root.cell_clicked(i);
                             }
                         }
                     }
@@ -191,95 +465,233 @@ export component SudokuWindow inherits Window {
             }
         }
 
-        // Button Container
+        // Control Toolbar: Keypad (1-9), Pen/Pencil, Erase
         HorizontalLayout {
-            spacing: 15px;
+            spacing: 6px;
             alignment: center;
 
+            // Pen vs Pencil Mode Toggle
             Rectangle {
-                width: 120px;
-                height: 45px;
-                border-radius: 8px;
-                background: solve_touch.has-hover ? #1565c0 : #1976d2;
-                border-width: 2px;
-                border-color: #0d47a1;
+                width: 72px;
+                height: 42px;
+                border-radius: 6px;
+                background: pencil_mode ? (root.dark_mode ? #7c3aed : #8b5cf6) : (root.dark_mode ? #27272a : #e2e8f0);
+                TouchArea { clicked => { root.toggle_pencil_mode(); } }
 
-                solve_touch := TouchArea {
-                    clicked => {
-                        root.solve_clicked();
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 4px;
+                    Text {
+                        text: pencil_mode ? "✎ Note" : "🖊 Pen";
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: pencil_mode ? white : (root.dark_mode ? #f4f4f5 : #334155);
+                        vertical-alignment: center;
                     }
+                }
+            }
+
+            // Digit Keys 1 to 9
+            for d in [1, 2, 3, 4, 5, 6, 7, 8, 9]: Rectangle {
+                width: 42px;
+                height: 42px;
+                border-radius: 6px;
+                background: d_touch.has-hover ? (root.dark_mode ? #3b82f6 : #bfdbfe) : (root.dark_mode ? #27272a : #ffffff);
+                border-width: 1px;
+                border-color: root.dark_mode ? #3f3f46 : #cbd5e1;
+
+                d_touch := TouchArea {
+                    clicked => { root.digit_entered(d); }
                 }
 
                 Text {
-                    text: "Solve";
-                    color: white;
-                    font-size: 18px;
-                    font-weight: 600;
+                    text: d;
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: root.dark_mode ? #f4f4f5 : #0f172a;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
             }
 
+            // Erase Key
             Rectangle {
-                width: 120px;
-                height: 45px;
-                border-radius: 8px;
-                background: clear_touch.has-hover ? #f57c00 : #ff9800;
-                border-width: 2px;
-                border-color: #e65100;
+                width: 50px;
+                height: 42px;
+                border-radius: 6px;
+                background: erase_touch.has-hover ? #ef4444 : (root.dark_mode ? #27272a : #fee2e2);
+                border-width: 1px;
+                border-color: #fca5a5;
 
-                clear_touch := TouchArea {
-                    clicked => {
-                        root.clear_clicked();
-                    }
+                erase_touch := TouchArea {
+                    clicked => { root.erase_clicked(); }
                 }
 
                 Text {
-                    text: "Clear";
-                    color: white;
+                    text: "⌫";
                     font-size: 18px;
-                    font-weight: 600;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
-            }
-
-            Rectangle {
-                width: 120px;
-                height: 45px;
-                border-radius: 8px;
-                background: reset_touch.has-hover ? #c62828 : #d32f2f;
-                border-width: 2px;
-                border-color: #b71c1c;
-
-                reset_touch := TouchArea {
-                    clicked => {
-                        root.reset_clicked();
-                    }
-                }
-
-                Text {
-                    text: "Reset";
-                    color: white;
-                    font-size: 18px;
-                    font-weight: 600;
+                    font-weight: 700;
+                    color: erase_touch.has-hover ? white : #dc2626;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
             }
         }
 
-        // Instructions
-        Text {
-            text: "Click a cell and type 1-9 to enter numbers. Given numbers are shown in bold blue.";
-            font-size: 14px;
-            color: #616161;
-            horizontal-alignment: center;
-            wrap: word-wrap;
-        }
-    }
+        // Secondary Actions: Undo, Redo, Hint, Auto-Notes, Check
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: center;
 
-    cell_clicked(index) => {
-        selected_cell = index;
+            // Undo
+            Rectangle {
+                width: 80px;
+                height: 34px;
+                border-radius: 6px;
+                background: root.dark_mode ? #27272a : #f1f5f9;
+                opacity: can_undo ? 1.0 : 0.4;
+                TouchArea {
+                    enabled: can_undo;
+                    clicked => { root.undo_clicked(); }
+                }
+                Text {
+                    text: "↶ Undo";
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: root.dark_mode ? #f4f4f5 : #334155;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Redo
+            Rectangle {
+                width: 80px;
+                height: 34px;
+                border-radius: 6px;
+                background: root.dark_mode ? #27272a : #f1f5f9;
+                opacity: can_redo ? 1.0 : 0.4;
+                TouchArea {
+                    enabled: can_redo;
+                    clicked => { root.redo_clicked(); }
+                }
+                Text {
+                    text: "↷ Redo";
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: root.dark_mode ? #f4f4f5 : #334155;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Hint
+            Rectangle {
+                width: 80px;
+                height: 34px;
+                border-radius: 6px;
+                background: hint_touch.has-hover ? #d97706 : #f59e0b;
+                hint_touch := TouchArea { clicked => { root.hint_clicked(); } }
+                Text {
+                    text: "💡 Hint";
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: white;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Auto Notes
+            Rectangle {
+                width: 95px;
+                height: 34px;
+                border-radius: 6px;
+                background: root.dark_mode ? #27272a : #f1f5f9;
+                TouchArea { clicked => { root.auto_notes_clicked(); } }
+                Text {
+                    text: "📝 Auto Notes";
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: root.dark_mode ? #c084fc : #7c3aed;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Check / Validate
+            Rectangle {
+                width: 80px;
+                height: 34px;
+                border-radius: 6px;
+                background: root.dark_mode ? #27272a : #f1f5f9;
+                TouchArea { clicked => { root.validate_clicked(); } }
+                Text {
+                    text: "✓ Check";
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: root.dark_mode ? #4ade80 : #16a34a;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // Bottom Actions: Solve, Clear User Entries, Reset
+        HorizontalLayout {
+            spacing: 12px;
+            alignment: center;
+
+            // Solve Button
+            Rectangle {
+                width: 130px;
+                height: 40px;
+                border-radius: 6px;
+                background: solve_touch.has-hover ? #1e40af : #2563eb;
+                solve_touch := TouchArea { clicked => { root.solve_clicked(); } }
+                Text {
+                    text: "Solve Puzzle";
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: white;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Clear User Entries
+            Rectangle {
+                width: 120px;
+                height: 40px;
+                border-radius: 6px;
+                background: clear_touch.has-hover ? #ea580c : #f97316;
+                clear_touch := TouchArea { clicked => { root.clear_clicked(); } }
+                Text {
+                    text: "Clear Entries";
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: white;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Reset Board
+            Rectangle {
+                width: 110px;
+                height: 40px;
+                border-radius: 6px;
+                background: reset_touch.has-hover ? #b91c1c : #dc2626;
+                reset_touch := TouchArea { clicked => { root.reset_clicked(); } }
+                Text {
+                    text: "Reset Game";
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: white;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
     }
 }
