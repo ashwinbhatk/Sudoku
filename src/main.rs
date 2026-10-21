@@ -1,5 +1,9 @@
-use sudoku::ui_bridge;
-
+#[cfg(feature = "slint-ui")]
 fn main() -> Result<(), slint::PlatformError> {
-    ui_bridge::run()
+    sudoku::ui_bridge::run()
+}
+
+#[cfg(not(feature = "slint-ui"))]
+fn main() {
+    println!("Sudoku Pro Engine: CLI mode active. Run with --features slint-ui to launch GUI.");
 }
