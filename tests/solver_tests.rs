@@ -137,3 +137,43 @@ fn preserves_original_values() {
         }
     }
 }
+
+
+#[test]
+fn detects_conflicts() {
+    let mut grid: [[u8; 9]; 9] = [[0; 9]; 9];
+    grid[0][0] = 5;
+    grid[0][4] = 5; // Row conflict
+
+    let conflicts = sudoku::solver::find_conflicts(&grid);
+    assert!(conflicts[0]); // (0, 0)
+    assert!(conflicts[4]); // (0, 4)
+    assert!(!conflicts[1]); // (0, 1)
+
+    assert!(!sudoku::solver::is_valid_puzzle(&grid));
+}
+
+#[test]
+fn candidates_and_hint() {
+    let grid: [[u8; 9]; 9] = [
+        [5, 3, 0, 0, 7, 0, 0, 0, 0],
+        [6, 0, 0, 1, 9, 5, 0, 0, 0],
+        [0, 9, 8, 0, 0, 0, 0, 6, 0],
+        [8, 0, 0, 0, 6, 0, 0, 0, 3],
+        [4, 0, 0, 8, 0, 3, 0, 0, 1],
+        [7, 0, 0, 0, 2, 0, 0, 0, 6],
+        [0, 6, 0, 0, 0, 0, 2, 8, 0],
+        [0, 0, 0, 4, 1, 9, 0, 0, 5],
+        [0, 0, 0, 0, 8, 0, 0, 7, 9],
+    ];
+
+    let mask = sudoku::solver::get_candidates_bitmask(0, 2, &grid);
+    // (0, 2) in this grid can be 1, 2, 4 (mask bits 0, 1, 3)
+    assert_ne!(mask, 0);
+
+    let hint = sudoku::solver::get_hint(&grid);
+    assert!(hint.is_some());
+    let (r, c, val, _msg) = hint.unwrap();
+    assert_eq!(grid[r][c], 0);
+    assert!((1..=9).contains(&val));
+}
